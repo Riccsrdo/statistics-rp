@@ -1,0 +1,41 @@
+body {
+    font-family: sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f4f4;
+}
+
+header, main {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+nav ul {
+    list-style: none;
+    padding: 0;
+}
+
+nav a {
+    display: block;
+    padding: 15px;
+    margin-bottom: 10px;
+    background: #e9ecef;
+    color: #333;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+}
+
+nav a:hover {
+    background-color: #ced4da;
+}
+
+.disabled-link {
+    background-color: #f8f9fa;
+    color: #aaa;
+    pointer-events: none;
+}
