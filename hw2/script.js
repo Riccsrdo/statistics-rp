@@ -1,0 +1,138 @@
+"use strict";
+
+class TextAnalyzer {
+
+    lettersDistributionRelative(text){
+        const absoluteDist = this.lettersDistributionAbsolute(text);
+        const totalLetters = Array.from(absoluteDist.values()).reduce((a, b) => a + b, 0);
+        const relativeDist = new Map();
+
+        absoluteDist.forEach((value, key) => {
+            relativeDist.set(key, (value / totalLetters * 100).toFixed(2));
+        });
+
+        return relativeDist;
+    }
+
+    lettersDistributionAbsolute(text){
+        
+        // normalize the text to lowercase
+        text = text.toLowerCase();
+
+        // create a frequency map
+        const frequencyMap = new Map();
+
+        for (const char of text){
+            if (char >= 'a' && char <= 'z'){
+                frequencyMap.set(char, (frequencyMap.get(char) || 0) + 1);
+            }       
+        }
+
+        // sort the frequency map by value
+        const sortedFreqMap = new Map([...frequencyMap.entries()].sort((a, b) => b[1] - a[1]));
+
+        return sortedFreqMap;
+    }
+
+}
+
+class CeaserCipher {
+
+    letters="abcdefghijklmnopqrstuvwxyz";
+
+    encrypt(text, shift){
+        const alphSize = 26;
+        // Normalize the shift value
+        shift = shift % alphSize;
+        // save the encrypted text
+        let encryptedText = "";
+
+        // split the text into characters
+        for (const char of text){
+            // depending on ascii value, we can determine if it's upper or lower case
+            if( char >= 'A' && char <= 'Z'){
+                // Encrypt uppercase letters
+                let code = char.charCodeAt(0);
+                code = ((code - 65 + shift) % alphSize) + 65;
+                encryptedText += String.fromCharCode(code);
+            } else if (char >= 'a' && char <= 'z'){
+                // Encrypt lowercase letters
+                let code = char.charCodeAt(0);
+                code = ((code - 97 + shift) % alphSize) + 97;
+                encryptedText += String.fromCharCode(code);
+            } else {
+                // non-alph characters remain unchanged
+                encryptedText += char;
+            }
+        }
+
+        return encryptedText;
+        
+    }
+
+    decryptFromDistribution(text){
+
+        // my idea is based on this source: https://www.youtube.com/watch?v=3en7PBeS_kA
+        // basically we compute the distribution, we identify the most frequent letter in the text
+        // and assume it corresponds to 'e', the most frequent letter in English
+        // then we can compute the shift with shift = (most_freq_letter - 'e') % 26
+        // and we can decrypt the text with that shift, using the encryption function with 26 - shift
+
+        // compute the frequency distribution of letters in the text
+        const textAnalyzer = new TextAnalyzer();
+        const distribution = textAnalyzer.lettersDistributionAbsolute(text);
+
+        // get the most frequent letter in the text
+        const mostFrequentLetter = distribution.keys().next().value;
+
+        // compute the shift assuming the most frequent letter corresponds to 'e'
+        const assumedShift = (mostFrequentLetter.charCodeAt(0) - 'e'.charCodeAt(0)) % 26;
+
+        // decrypt the text using the computed shift
+        return this.encrypt(text, 26 - assumedShift);
+        
+    }
+
+}
+
+
+document.addEventListener("DOMContentLoaded", () => {
+    // Take inputs from the html form
+    const textAnalyzer = new TextAnalyzer();
+    const ceaserCipher = new CeaserCipher();
+
+    const inputText = document.getElementById("textToAnalyze");
+    const outputText = document.getElementById("outputText");
+    const distributionOutput = document.getElementById("distributionOutput");
+
+    document.getElementById("btnAnalyze").addEventListener("click", () => {
+        distributionOutput.innerHTML = "";
+        const distribution = textAnalyzer.lettersDistributionAbsolute(inputText.value);
+        let output = "Absolute Frequency Distribution:<br>";
+        distribution.forEach((value, key) => {
+            output += `${key}: ${value}<br>`;
+        });
+        distributionOutput.innerHTML = output;
+
+        const distributionRel = textAnalyzer.lettersDistributionRelative(inputText.value);
+        output = "Relative Frequency Distribution:<br>";
+        distributionRel.forEach((value, key) => {
+            output += `${key}: ${value}%<br>`;
+        });
+        distributionOutput.innerHTML += output;
+
+
+    });
+
+    document.getElementById("btnEncrypt").addEventListener("click", () => {
+
+        const shift = parseInt(document.getElementById("shiftKey").value);
+        outputText.value = ceaserCipher.encrypt(inputText.value, shift);
+    });
+
+    document.getElementById("btnDecryptFreq").addEventListener("click", () => {
+        outputText.value = ceaserCipher.decryptFromDistribution(inputText.value);
+    });
+
+
+});
