@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Law of Large Numbers (LLN) Simulation</title>
+</head>
+<body>
+
+    <h1>Law of Large Numbers Simulation</h1>
+    
+    <div>
+        <label for="n-trials">Trials per trajectory (n):</label>
+        <input type="number" id="n-trials" value="1000" min="10" max="100000">
+    </div>
+    <br>
+    <div>
+        <label for="m-trajectories">Number of trajectories (m):</label>
+        <input type="number" id="m-trajectories" value="200" min="1" max="5000">
+    </div>
+    <br>
+    <div>
+        <label for="p-success">Probability of success (p):</label>
+        <input type="range" id="p-success" value="0.5" min="0.01" max="0.99" step="0.01">
+        <span id="p-value-display">0.50</span>
+    </div>
+    <br>
+    <button id="start-sim">Run Simulation</button>
+    
+    <div id="status"></div>
+    <br>
+    <canvas id="simulationCanvas" width="1000" height="500" style="border:1px solid #000;"></canvas>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('simulationCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // UI Elements
+            const nInput = document.getElementById('n-trials');
+            const mInput = document.getElementById('m-trajectories');
+            const pInput = document.getElementById('p-success');
+            const pValueDisplay = document.getElementById('p-value-display');
+            const startBtn = document.getElementById('start-sim');
+            const statusDiv = document.getElementById('status');
+            
+            // Update probability display
+            pInput.addEventListener('input', () => {
+                pValueDisplay.textContent = parseFloat(pInput.value).toFixed(2);
+            });
+
+            // Main function
+            startBtn.addEventListener('click', runSimulation);
+
+            function runSimulation() {
+                // Disable button and show status
+                startBtn.disabled = true;
+                statusDiv.textContent = 'Simulation in progress...';
+                
+                // Allow UI to update before starting heavy computation
+                setTimeout(() => {
+                    const n = parseInt(nInput.value);
+                    const m = parseInt(mInput.value);
+                    const p = parseFloat(pInput.value);
+                    
+                    // --- 1. Data Generation ---
+                    const finalFrequencies = [];
+                    const allTrajectories = [];
+
+                    for (let i = 0; i < m; i++) {
+                        let successes = 0;
+                        const trajectory = [];
+                        for (let j = 0; j < n; j++) {
+                            if (Math.random() < p) {
+                                successes++;
+                            }
+                            trajectory.push(successes / (j + 1));
+                        }
+                        allTrajectories.push(trajectory);
+                        finalFrequencies.push(trajectory[trajectory.length - 1]);
+                    }
+
+                    // --- 2. Drawing on Canvas ---
+                    draw(n, p, allTrajectories, finalFrequencies);
+
+                    // Re-enable button and clear status
+                    startBtn.disabled = false;
+                    statusDiv.textContent = 'Simulation complete.';
+                }, 50);
+            }
+
+            function draw(n, p, trajectories, finalFrequencies) {
+                const width = canvas.width;
+                const height = canvas.height;
+                ctx.clearRect(0, 0, width, height);
+
+                // --- Layout ---
+                const margin = { top: 20, right: 10, bottom: 40, left: 50 };
+                const plotWidthRatio = 0.75;
+                
+                const mainPlotWidth = (width - margin.left - margin.right) * plotWidthRatio;
+                const histWidth = (width - margin.left - margin.right) * (1 - plotWidthRatio);
+                const plotHeight = height - margin.top - margin.bottom;
+
+                // --- Coordinate Mapping Functions ---
+                const mapX = (trial) => margin.left + (trial / n) * mainPlotWidth;
+                const mapY = (freq) => margin.top + (1 - freq) * plotHeight;
+
+                // --- Draw Axes and Grid ---
+                drawAxesAndGrid(n, p, margin, width, height, mainPlotWidth, plotHeight, mapY);
+                
+                // --- Draw Trajectories ---
+                ctx.globalAlpha = Math.max(0.05, 1 / trajectories.length);
+                ctx.strokeStyle = 'dodgerblue';
+                ctx.lineWidth = 1;
+                trajectories.forEach(traj => {
+                    ctx.beginPath();
+                    ctx.moveTo(mapX(0), mapY(traj[0]));
+                    for (let i = 1; i < traj.length; i++) {
+                        ctx.lineTo(mapX(i), mapY(traj[i]));
+                    }
+                    ctx.stroke();
+                });
+                ctx.globalAlpha = 1.0;
+
+                // --- Draw Histogram ---
+                drawHistogram(finalFrequencies, p, margin, mainPlotWidth, histWidth, plotHeight, mapY);
+            }
+
+            function drawAxesAndGrid(n, p, margin, width, height, mainPlotWidth, plotHeight, mapY) {
+                ctx.beginPath();
+                ctx.strokeStyle = '#ccc';
+                ctx.fillStyle = '#333';
+                ctx.font = '12px Arial';
+
+                // Y-Axis
+                for (let i = 0; i <= 10; i++) {
+                    const y = mapY(i / 10);
+                    ctx.moveTo(margin.left, y);
+                    ctx.lineTo(margin.left + mainPlotWidth, y);
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText((i / 10).toFixed(1), margin.left - 8, y);
+                }
+                
+                // X-Axis
+                for (let i = 0; i <= 5; i++) {
+                    const x = margin.left + (i/5) * mainPlotWidth;
+                    ctx.moveTo(x, margin.top);
+                    ctx.lineTo(x, margin.top + plotHeight);
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(Math.round(i/5 * n), x, margin.top + plotHeight + 8);
+                }
+                ctx.stroke();
+
+                // Axis Labels
+                ctx.save();
+                ctx.translate(15, margin.top + plotHeight / 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.textAlign = 'center';
+                ctx.fillText('Relative Frequency f(n)', 0, 0);
+                ctx.restore();
+                ctx.textAlign = 'center';
+                ctx.fillText('Number of Trials (n)', margin.left + mainPlotWidth / 2, height - 10);
+
+                // Theoretical probability line
+                ctx.beginPath();
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([5, 5]);
+                const yP = mapY(p);
+                ctx.moveTo(margin.left, yP);
+                ctx.lineTo(width - margin.right, yP);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            function drawHistogram(finalFrequencies, p, margin, mainPlotWidth, histWidth, plotHeight, mapY) {
+                const numBins = 20;
+                const binCounts = new Array(numBins).fill(0);
+                const binWidth = 1.0 / numBins;
+
+                finalFrequencies.forEach(freq => {
+                    const binIndex = Math.min(Math.floor(freq / binWidth), numBins - 1);
+                    binCounts[binIndex]++;
+                });
+
+                const maxCount = Math.max(...binCounts);
+                if (maxCount === 0) return;
+
+                const histXStart = margin.left + mainPlotWidth;
+
+                ctx.fillStyle = 'rgba(0, 180, 0, 0.6)';
+                ctx.strokeStyle = 'darkgreen';
+                ctx.lineWidth = 1;
+
+                binCounts.forEach((count, i) => {
+                    const binY = mapY(i * binWidth);
+                    const barHeight = mapY((i + 1) * binWidth) - binY;
+                    const barWidth = (count / maxCount) * histWidth * 0.9;
+                    ctx.fillRect(histXStart, binY + barHeight, barWidth, -barHeight);
+                    ctx.strokeRect(histXStart, binY + barHeight, barWidth, -barHeight);
+                });
+            }
+
+            // Run a default simulation on load
+            startBtn.click();
+        });
+    </script>
+
+</body>
+</html>

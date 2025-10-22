@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homework 3</title>
+    <link rel="stylesheet" href="../style.css">
+
+</head>
+<body>
+    <a href="../index.html">Torna alla home</a>
+    <h1>Homework 3</h1>
+
+    <main>
+
+        <section id="applicazione">
+            <h2> RSA cipher </h2>
+            <div id="controlli">
+
+                <textarea id="textToAnalyze" rows="10" cols="80"
+                onclick="if(!this.cleared){this.value='';this.cleared=true;}"
+                >Please put here the text you want to encrypt/decrypt</textarea>
+                <br>
+
+                <button id="btnGenerateKeys">Generate RSA Keys</button>
+                <br>
+                <pre id="keys"></pre>
+                <br>
+                <br>
+
+                <button id="btnEncrypt">Encrypt Text with PK</button>
+                <button id="btnDecrypt">Decrypt Text with SK</button>
+                <br>
+
+                <button id="btnDecryptFreq">Decrypt Text with Frequency Analysis</button>
+
+                <h3> Encoded/Decoded text </h3>
+                <textarea id="outputText" rows="10" cols="80" readonly></textarea>
+                <br>
+
+            </div>
+        </section>
+    
+        
+
+    </main>
+</body>
+
+</html>
+
+<script>
+    "use strict";
+
+class RSA {
+
+    // metodo calcolo MCD
+    gcd(a,b) {
+        while(b){
+            [a,b] = [b,a%b];
+        }
+        return a;
+    }
+
+    // metodo calcolo inverso mod n
+    modInverse(e, phi) {
+        let [m0, y, x] = [phi, 0n, 1n]; // inizializzo m0, y, x
+        if (phi === 1n) return 0n; // se phi è 1, l'inverso mod non esiste
+        while (e > 1n) { // finché e è maggiore di 1
+            const q = e/m0; // calcolo quoziente
+            [e, m0] = [m0, e % m0]; // aggiorno e e m0
+            [x,y] = [y, x - q * y]; // aggiorno x e y
+        }
+        if (x <0n) x += phi; // se x è negativo, aggiungo phi
+        return x; // ritorno l'inverso mod
+
+    }
+
+    // funzione per testare primalità
+    isPrime(n){
+        if (n <= 1n) return false; // numeri minori o uguali a 1 non sono primi
+        if (n <= 3n) return true; // 2 e 3 sono primi
+        if (n % 2n === 0n || n % 3n === 0n) return false; // multipli di 2 e 3 non sono primi
+        for (let i = 5n; i * i <= n; i += 6n) { // controllo fino alla radice quadrata di n
+            if (n % i === 0n || n % (i + 2n) === 0n) return false; // se n è divisibile per i o i+2, non è primo
+        }
+        return true; 
+    }
+
+    generatePrime(bits) {
+        const min = 1n << (BigInt(bits) - 1n); // calcolo il minimo numero con bits
+        const max = (1n << BigInt(bits)) - 1n; // calcolo il massimo numero con bits
+        while(true){
+            let p = BigInt(Math.floor(Math.random() * (Number(max-min) +1))) + min; // genero un numero casuale tra min e max
+            if(this.isPrime(p)) return p; // se p è primo, lo ritorno
+        }
+    }
+
+    generateKeys(bitLength = 32) {
+        const p = this.generatePrime(bitLength / 2); // genero primo p
+        const q = this.generatePrime(bitLength / 2); // genero primo q
+        const n = p * q; // calcolo n
+
+        // calcolo phi(n)
+        const phi = (p - 1n) * (q - 1n);
+
+        // scelgo e
+        let e = 65537n; // valore comunemente usato per e
+
+        if( e >= phi || this.gcd(e, phi) !== 1n){
+            e = 17n;
+        }
+
+        // calcolo d
+        const d = this.modInverse(e, phi);
+
+        return {
+            publicKey: { e: e, n: n },
+            privateKey: { d: d, n: n}
+        };
+    }
+
+    modPow(base, exp, mod){
+        let res = 1n; // inizializzo risultato
+        base = base % mod; // riduco base modulo mod
+        while (exp > 0n) {
+            if (exp % 2n === 1n) res = (res * base) % mod; // se exp è dispari, moltiplico res per base
+            exp = exp >> 1n; // divido exp per 2
+            base = (base * base) % mod; // aggiorno base
+        }
+
+        return res; // ritorno risultato
+    }
+
+    encrypt(message, publicKey) {
+        return this.modPow(message, publicKey.e, publicKey.n); // calcolo ciphertext = message^e mod n
+    }
+
+    decrypt(ciphertext, privateKey) {
+        return this.modPow(ciphertext, privateKey.d, privateKey.n); // calcolo message = ciphertext^d mod n
+    }
+
+    // cifro una stringa, lettera per lettera
+    encryptString(plainText, publicKey) {
+        const encryptedMessage = [];
+        for(let i=0; i<plainText.length; i++){ // itero su ogni carattere della stringa
+            const charCode = BigInt(plainText.charCodeAt(i)); // ottengo il codice ashii del carattere, convertito in bigint
+            encryptedMessage.push(this.encrypt(charCode, publicKey)); // cifro il codice ashii e lo aggiungo all'array
+        }
+
+        return encryptedMessage;
+    }
+
+    // decifro una stringa, lettera per lettera
+    decryptString(encryptedMessage, privateKey) {
+        let decryptedText = '';
+        for (const num of encryptedMessage) { // itero su ogni numero nell'array
+            const decryptedCharCode = this.decrypt(num, privateKey); // decifro il numero
+            decryptedText += String.fromCharCode(Number(decryptedCharCode)); // converto il codice ashii in carattere e lo aggiungo alla stringa
+        }
+
+        return decryptedText;
+    }
+
+}
+
+class FrequencyAttack {
+    
+    // Funzione per "pulire" e normalizzare il testo
+    normalizeText(text) {
+        return text.toLowerCase().replace(/[^a-z]/g, '');
+    }
+
+    // Calcola la distribuzione di frequenza delle lettere in un testo
+    computeLetterDistribution(text) {
+        const distribution = new Map();
+        for (const char of text) {
+            distribution.set(char, (distribution.get(char) || 0) + 1);
+        }
+        return new Map([...distribution.entries()].sort((a, b) => b[1] - a[1]));
+    }
+
+    // Calcola la distribuzione di frequenza dei numeri cifrati
+    computeCipherDistribution(encryptedArray) {
+        const distribution = new Map();
+        for (const num of encryptedArray) {
+            distribution.set(num, (distribution.get(num) || 0) + 1);
+        }
+        return new Map([...distribution.entries()].sort((a, b) => b[1] - a[1]));
+    }
+
+    /**
+     * Metodo di decodifica corretto.
+     * Accetta il testo cifrato E il testo originale per un confronto diretto delle distribuzioni.
+     */
+    decode(encryptedArray, originalPlainText) {
+        // 1. Pulisci il testo originale e calcola la sua distribuzione di frequenza
+        const normalizedText = this.normalizeText(originalPlainText);
+        const plaintextDistribution = this.computeLetterDistribution(normalizedText);
+
+        // 2. Calcola la distribuzione di frequenza dei numeri nel testo cifrato
+        // Nota: Qui non possiamo pulire il testo cifrato, perché non sappiamo a priori
+        // quali numeri corrispondono a spazi o punteggiatura. Li ignoreremo nella mappa.
+        const cipherDistribution = this.computeCipherDistribution(encryptedArray);
+
+        // 3. Estrai le lettere e i numeri ordinati per frequenza
+        const sortedPlaintextLetters = Array.from(plaintextDistribution.keys());
+        const sortedCipherNumbers = Array.from(cipherDistribution.keys());
+
+        // 4. Crea la mappa di sostituzione basata sulle due distribuzioni
+        const substitutionMap = new Map();
+        // Attenzione: la lunghezza delle due liste potrebbe essere diversa se il testo originale
+        // contiene caratteri (es. spazi) che vengono cifrati ma che noi ignoriamo nell'analisi.
+        // L'attacco funzionerà solo sui caratteri alfabetici.
+        const mapSize = Math.min(sortedPlaintextLetters.length, sortedCipherNumbers.length);
+        
+        for (let i = 0; i < mapSize; i++) {
+            // Associa il numero più frequente alla lettera più frequente, e così via
+            substitutionMap.set(sortedCipherNumbers[i], sortedPlaintextLetters[i]);
+        }
+
+        // 5. Decodifica il messaggio usando la mappa creata
+        let decodedMessage = '';
+        for (const num of encryptedArray) {
+            decodedMessage += substitutionMap.get(num) || '?'; // Sostituisci con '?' i caratteri non trovati (spazi, etc.)
+        }
+
+        return decodedMessage;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // istanzio le classi
+    const rsa = new RSA();
+    const freqAttack = new FrequencyAttack();
+
+    // gestisco input e output
+    const textArea = document.getElementById('textToAnalyze');
+    const outputArea = document.getElementById('outputText');
+
+    let publicKey, privateKey; // variabili per chiavi
+    let encryptedMessage; // variabile per messaggio cifrato
+
+    // gestisco i bottoni
+    document.getElementById('btnGenerateKeys').addEventListener('click', () => {
+        // genero chiavi pubbliche e private, mostrandole a schermo
+        const keys = rsa.generateKeys(32); // genero chiavi con lunghezza 32 bit
+        publicKey = keys.publicKey;
+        privateKey = keys.privateKey;
+        document.getElementById('keys').textContent =
+            `Public Key (e, n): (${publicKey.e}, ${publicKey.n})\n` +
+            `Private Key (d, n): (${privateKey.d}, ${privateKey.n})`;
+        
+        
+    });
+
+    document.getElementById('btnEncrypt').addEventListener('click', () => {
+
+        if (!publicKey) {
+            alert("Per favore, genera prima le chiavi RSA!");
+            return; // Interrompe l'esecuzione della funzione
+        }
+
+        const plainText = textArea.value; // prendo il testo da cifrare
+        const encryptedMessage_m = rsa.encryptString(plainText, publicKey); // cifro il testo
+        outputArea.value = encryptedMessage_m.join(', '); // mostro il messaggio cifrato
+
+        encryptedMessage = encryptedMessage_m; // salvo il messaggio cifrato per l'attacco di frequenza
+
+    });
+
+    document.getElementById('btnDecrypt').addEventListener('click', () => {
+        if (!privateKey) {
+            alert("Per favore, genera prima le chiavi RSA!");
+            return; // Interrompe l'esecuzione della funzione
+        }
+
+        const encryptedText = outputArea.value.split(',').map(num => BigInt(num.trim())); // prendo il testo cifrato e lo converto in array di bigint
+        const decryptedMessage = rsa.decryptString(encryptedText, privateKey); // decifro il messaggio
+        outputArea.value = decryptedMessage; // mostro il messaggio decifrato
+
+    });
+
+    document.getElementById('btnDecryptFreq').addEventListener('click', () => {
+        if (!encryptedMessage || encryptedMessage.length === 0) {
+            alert("Prima cifra un messaggio!");
+            return;
+        }
+        // decifro il messaggio usando l'attacco di frequenza
+        const originalPlainText = textArea.value; // prendo il testo originale per l'analisi
+        const decodedMessage = freqAttack.decode(encryptedMessage, originalPlainText);
+        outputArea.value = decodedMessage; // mostro il messaggio decifrato
+
+        });
+    });
+</script>
+
+

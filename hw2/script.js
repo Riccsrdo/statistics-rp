@@ -71,7 +71,7 @@ class CeaserCipher {
     }
 
     // source: https://pi.math.cornell.edu/~mec/2003-2004/cryptography/subs/frequencies.html
-    englishLetterFrequencies = { // Renamed 'letters' to 'englishLetterFrequencies' for clarity and to avoid conflict with 'letters' property.
+    englishLetterFrequencies = { 
         'e': 12.02,
         't': 9.10,
         'a': 8.12,
